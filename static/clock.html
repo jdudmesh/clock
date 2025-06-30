@@ -5,7 +5,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js" integrity="sha256-RJMXreeIHpSVENthSZHhlcOgmcTHkcJNrOxV+fSipFI=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
   <link href="dist.css" rel="stylesheet" />
   <style>
     body {
@@ -36,6 +36,28 @@
       </div>
     </div>
   </div>
+  <script>
+    function loadDateTime() {
+      $("#date").load("/snippets/date");
+      $("#time").load("/snippets/time");
+    }
+    function loadWeather() {
+      $("#temp").load("/snippets/temperature");
+      $("#humidity").load("/snippets/humidity");
+    }
+    function loadSunriseSunset() {
+      $("#sunrise").load("/snippets/sunrise");
+      $("#sunset").load("/snippets/sunset");
+    }
+    $(document).ready(function() {
+      loadDateTime();
+      loadWeather();
+      loadSunriseSunset();
+      setInterval(loadDateTime, 20000);
+      setInterval(loadWeather, 300000);
+      setInterval(loadSunriseSunset, 300000);
+    });
+  </script>
 </body>
 
 </html>

@@ -1,0 +1,46 @@
+package main
+
+import (
+	"context"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"clock/router"
+	"clock/sunset"
+	"clock/temperature"
+
+	"github.com/rs/zerolog"
+)
+
+func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger().Level(zerolog.DebugLevel)
+	temperature := temperature.New(&logger)
+	sunset := sunset.New(&logger)
+
+	go temperature.Run(ctx)
+	go sunset.Run(ctx)
+
+	mux := router.NewRouter(&logger, temperature, sunset)
+	server := http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
+
+	go func() {
+		logger.Info().Msg("starting server")
+		<-ctx.Done()
+		server.Shutdown(context.Background())
+		logger.Info().Msg("server stopped")
+	}()
+
+	err := server.ListenAndServe()
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to start server")
+		os.Exit(1)
+	}
+}

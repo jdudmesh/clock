@@ -1,0 +1,16 @@
+{
+  "name": "clock",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tailwindcss -i ./main.css -o ./dist.css --watch",
+    "dist": "rsync --include-from dist.txt * admin@192.168.1.2:/volume1/Web"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "tailwindcss": "^3.4.13"
+  }
+}

@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"time"
 
-	"clock/sunset"
+	"clock/almanac"
 	"clock/temperature"
 
 	"github.com/rs/zerolog"
 )
 
-func NewRouter(logger *zerolog.Logger, temperature *temperature.Temperature, sunset *sunset.Sunset) *http.ServeMux {
+func NewRouter(logger *zerolog.Logger, temperature *temperature.Temperature, almanac *almanac.Almanac) *http.ServeMux {
 	loc, err := time.LoadLocation("Europe/Paris")
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to load location")
@@ -62,15 +62,15 @@ func NewRouter(logger *zerolog.Logger, temperature *temperature.Temperature, sun
 	})
 
 	mux.HandleFunc("/snippets/sunrise", func(w http.ResponseWriter, r *http.Request) {
-		sunrise, _ := sunset.Get()
+		sunriseTime := almanac.GetSunrise()
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(fmt.Sprintf("<span>↑%s</span>", sunrise.Format("15:04"))))
+		w.Write([]byte(fmt.Sprintf("<span>↑%s</span>", sunriseTime.In(loc).Format("15:04"))))
 	})
 
 	mux.HandleFunc("/snippets/sunset", func(w http.ResponseWriter, r *http.Request) {
-		_, sunsetVal := sunset.Get()
+		sunsetTime := almanac.GetSunset()
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(fmt.Sprintf("<span>↓%s</span>", sunsetVal.Format("15:04"))))
+		w.Write([]byte(fmt.Sprintf("<span>↓%s</span>", sunsetTime.In(loc).Format("15:04"))))
 	})
 
 	mux.HandleFunc("/snippets/date", func(w http.ResponseWriter, r *http.Request) {

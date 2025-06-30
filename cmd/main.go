@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"clock/almanac"
 	"clock/router"
-	"clock/sunset"
 	"clock/temperature"
 
 	"github.com/rs/zerolog"
@@ -20,12 +20,12 @@ func main() {
 
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger().Level(zerolog.DebugLevel)
 	temperature := temperature.New(&logger)
-	sunset := sunset.New(&logger)
+	almanac := almanac.New(&logger)
 
 	go temperature.Run(ctx)
-	go sunset.Run(ctx)
+	go almanac.Run(ctx)
 
-	mux := router.NewRouter(&logger, temperature, sunset)
+	mux := router.NewRouter(&logger, temperature, almanac)
 	server := http.Server{
 		Addr:    ":8080",
 		Handler: mux,

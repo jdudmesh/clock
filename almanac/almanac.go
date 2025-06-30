@@ -1,4 +1,4 @@
-package sunset
+package almanac
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 
 const url = "https://api.sunrisesunset.io/json?lat=48.744760&lng=-0.962368&timezone=UTC&time_format=24"
 
-type SunsetResults struct {
+type AlmanacResults struct {
 	Date       string `json:"date"`
 	Sunrise    string `json:"sunrise"`
 	Sunset     string `json:"sunset"`
@@ -28,20 +28,20 @@ type SunsetResults struct {
 	UTCOffset  int    `json:"utc_offset"`
 }
 
-type SunsetResponse struct {
-	Results SunsetResults `json:"results"`
-	Status  string        `json:"status"`
+type AlmanacResponse struct {
+	Results AlmanacResults `json:"results"`
+	Status  string         `json:"status"`
 }
 
-type Sunset struct {
-	data   *SunsetResults
+type Almanac struct {
+	data   *AlmanacResults
 	lock   sync.Mutex
 	logger *zerolog.Logger
 	client *http.Client
 }
 
-func New(logger *zerolog.Logger) *Sunset {
-	s := &Sunset{
+func New(logger *zerolog.Logger) *Almanac {
+	s := &Almanac{
 		lock:   sync.Mutex{},
 		logger: logger,
 		client: http.DefaultClient,
@@ -49,7 +49,7 @@ func New(logger *zerolog.Logger) *Sunset {
 	return s
 }
 
-func (s *Sunset) Fetch() {
+func (s *Almanac) Fetch() {
 	if s.data != nil {
 		sunsetDate, err := time.Parse("2006-01-02", s.data.Date)
 		if err != nil {
@@ -82,7 +82,7 @@ func (s *Sunset) Fetch() {
 		return
 	}
 
-	data := &SunsetResponse{}
+	data := &AlmanacResponse{}
 	defer resp.Body.Close()
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(data)
@@ -96,26 +96,33 @@ func (s *Sunset) Fetch() {
 	s.data = &data.Results
 }
 
-func (s *Sunset) Get() (time.Time, time.Time) {
+func (s *Almanac) GetSunrise() time.Time {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	sunrise, err := time.Parse("15:04:05", s.data.Sunrise)
+	sunrise, err := time.ParseInLocation("2006-01-02 15:04:05", s.data.Date+" "+s.data.Sunrise, time.UTC)
 	if err != nil {
 		s.logger.Error().Err(fmt.Errorf("parsing sunrise: %w", err))
-		return time.Time{}, time.Time{}
+		return time.Time{}
 	}
 
-	sunset, err := time.Parse("15:04:05", s.data.Sunset)
-	if err != nil {
-		s.logger.Error().Err(fmt.Errorf("parsing sunset: %w", err))
-		return time.Time{}, time.Time{}
-	}
-
-	return sunrise, sunset
+	return sunrise
 }
 
-func (s *Sunset) Run(ctx context.Context) {
+func (s *Almanac) GetSunset() time.Time {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	sunset, err := time.ParseInLocation("2006-01-02 15:04:05", s.data.Date+" "+s.data.Sunset, time.UTC)
+	if err != nil {
+		s.logger.Error().Err(fmt.Errorf("parsing sunset: %w", err))
+		return time.Time{}
+	}
+
+	return sunset
+}
+
+func (s *Almanac) Run(ctx context.Context) {
 	s.Fetch()
 	for {
 		select {

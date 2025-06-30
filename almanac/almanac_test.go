@@ -1,4 +1,4 @@
-package sunset
+package almanac
 
 import (
 	"os"
@@ -8,17 +8,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSunset(t *testing.T) {
+func TestAlmanac(t *testing.T) {
 	assert := assert.New(t)
 	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
-	sunset := New(&logger)
-	assert.NotNil(sunset)
+	almanac := New(&logger)
+	assert.NotNil(almanac)
 
-	sunset.Fetch()
-	assert.NotNil(sunset.data)
+	almanac.Fetch()
+	assert.NotNil(almanac.data)
 
-	sunriseTime, sunsetTime := sunset.Get()
+	sunriseTime := almanac.GetSunrise()
+	sunsetTime := almanac.GetSunset()
 	assert.NotNil(sunriseTime)
 	assert.NotNil(sunsetTime)
 

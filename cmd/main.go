@@ -32,15 +32,17 @@ func main() {
 	}
 
 	go func() {
-		logger.Info().Msg("starting server")
 		<-ctx.Done()
 		server.Shutdown(context.Background())
 		logger.Info().Msg("server stopped")
 	}()
 
+	logger.Info().Msg("starting server")
 	err := server.ListenAndServe()
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to start server")
-		os.Exit(1)
+		if err != http.ErrServerClosed {
+			logger.Error().Err(err).Msg("failed to start server")
+			os.Exit(1)
+		}
 	}
 }

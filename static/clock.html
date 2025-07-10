@@ -22,6 +22,7 @@
 </head>
 
 <body class="w-screen h-screen font-mono">
+  <div id="error" style="display: none;" class="text-2xl text-center error"></div>
   <div class="w-full h-full flex flex-col items-center justify-center">
     <div class="flex flex-col">
       <div id="date" class="text-2xl justify-center text-center" hx-get="/snippets/date" hx-trigger="load,every 1m"></div>
@@ -38,17 +39,50 @@
   </div>
   <script>
     function loadDateTime() {
-      $("#date").load("/snippets/date");
-      $("#time").load("/snippets/time");
+      try {
+        $("#date").load("/snippets/date");
+        $("#time").load("/snippets/time");
+        $("#date").removeClass("error");
+        $("#time").removeClass("error");
+        $("#error").hide();
+      } catch (error) {
+        $("#date").addClass("error");
+        $("#time").addClass("error");
+        $("#error").text("Error loading date and time:"+error.toString());
+        $("#error").show();
+      }
     }
+
     function loadWeather() {
-      $("#temp").load("/snippets/temperature");
-      $("#humidity").load("/snippets/humidity");
+      try {
+        $("#temp").load("/snippets/temperature");
+        $("#humidity").load("/snippets/humidity");
+        $("#temp").removeClass("error");
+        $("#humidity").removeClass("error");
+        $("#error").hide();
+      } catch (error) {
+        $("#temp").addClass("error");
+        $("#humidity").addClass("error");
+        $("#error").text("Error loading weather:"+error.toString());
+        $("#error").show();
+      }
     }
+
     function loadSunriseSunset() {
-      $("#sunrise").load("/snippets/sunrise");
-      $("#sunset").load("/snippets/sunset");
+      try {
+        $("#sunrise").load("/snippets/sunrise");
+        $("#sunset").load("/snippets/sunset");
+        $("#sunrise").removeClass("error");
+        $("#sunset").removeClass("error");
+        $("#error").hide();
+      } catch (error) {
+        $("#sunrise").addClass("error");
+        $("#sunset").addClass("error");
+        $("#error").text("Error loading sunrise and sunset:"+error.toString());
+        $("#error").show();
+      }
     }
+
     $(document).ready(function() {
       loadDateTime();
       loadWeather();

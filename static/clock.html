@@ -1,42 +1,89 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Clock</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-  <link href="dist.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"
+    integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet">
   <style>
+    .geist-mono {
+      font-family: "Geist Mono", monospace;
+      font-optical-sizing: auto;
+      font-weight: 400;
+      font-style: normal;
+    }
+
     body {
       background-color: rgb(15, 23, 42);
       color: white;
+      height: 100vh;
+      width: 100vw;
+      margin: 0;
+      padding: 0;
+      display: table-cell;
+      vertical-align: middle;
     }
+
     .error {
       color: red;
     }
+
     .battery {
       color: orange;
+    }
+
+    .text-small {
+      font-size: 5vw;
+    }
+
+    .text-large {
+      font-size: 30vw;
     }
   </style>
 </head>
 
-<body class="w-screen h-screen font-mono">
-  <div id="error" style="display: none;" class="text-2xl text-center error"></div>
-  <div class="w-full h-full flex flex-col items-center justify-center">
-    <div class="flex flex-col">
-      <div id="date" class="text-2xl justify-center text-center" hx-get="/snippets/date" hx-trigger="load,every 1m"></div>
-      <div id="time" class="text-8xl" hx-get="/snippets/time" hx-trigger="load,every 30s">--:--</div>
-      <div class="weather flex flex-row text-2xl justify-between">
-        <div id="temp" hx-get="/snippets/temperature" hx-trigger="load,every 1m">-°</div>
-        <div id="humidity" hx-get="/snippets/humidity" hx-trigger="load,every 1m">-%</div>
-      </div>
-      <div class="flex flex-row text-2xl items-center justify-center gap-8">
-        <div id="sunrise" hx-get="/snippets/sunrise" hx-trigger="load,every 5m">↑--:--</div>
-        <div id="sunset" hx-get="/snippets/sunset" hx-trigger="load,every 5m">↓--:--</div>
-      </div>
-    </div>
-  </div>
+<body class="geist-mono">
+  <table style="margin-left: 5vw; margin-right: 5vw; margin-top: auto; margin-bottom: auto;">
+    <tr>
+      <td style="width: 100%;" colspan="4">
+        <div id="date" class="text-small" style="text-align: center; width: 100%;">
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="width: 100%;" colspan="4">
+        <div id="time" class="text-large" style="text-align: center; width: 100%;">--:--</div>
+      </td>
+    </tr>
+    <tr>
+      <td style="width: 25%; text-align: left;">
+        <div id="temp" class="text-small">-°</div>
+      </td>
+      <td style="width: 50%;" colspan="2">
+        &nbsp;&nbsp;&nbsp;
+      </td>
+      <td style="width: 25%; text-align: right;">
+        <div id="humidity" class="text-small">-%</div>
+      </td>
+    </tr>
+    <tr>
+      <td style="width: 25%;">
+        &nbsp;&nbsp;&nbsp;
+      </td>
+      <td style="width: 50%; text-align: center;" colspan="2">
+        <div id="sunrise" style="display: inline-block;" class="text-small">↑--:--</div>
+        <div id="sunset" style="display: inline-block;" class="text-small">↓--:--</div>
+      </td>
+      <td style="width: 25%;">
+        &nbsp;&nbsp;&nbsp;
+      </td>
+  </table>
   <script>
     function loadDateTime() {
       try {
@@ -48,7 +95,7 @@
       } catch (error) {
         $("#date").addClass("error");
         $("#time").addClass("error");
-        $("#error").text("Error loading date and time:"+error.toString());
+        $("#error").text("Error loading date and time:" + error.toString());
         $("#error").show();
       }
     }
@@ -63,7 +110,7 @@
       } catch (error) {
         $("#temp").addClass("error");
         $("#humidity").addClass("error");
-        $("#error").text("Error loading weather:"+error.toString());
+        $("#error").text("Error loading weather:" + error.toString());
         $("#error").show();
       }
     }
@@ -78,12 +125,12 @@
       } catch (error) {
         $("#sunrise").addClass("error");
         $("#sunset").addClass("error");
-        $("#error").text("Error loading sunrise and sunset:"+error.toString());
+        $("#error").text("Error loading sunrise and sunset:" + error.toString());
         $("#error").show();
       }
     }
 
-    $(document).ready(function() {
+    $(document).ready(function () {
       loadDateTime();
       loadWeather();
       loadSunriseSunset();

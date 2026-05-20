@@ -1,6 +1,7 @@
 package temperature
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,6 +25,7 @@ type Temperature struct {
 	logger      *zerolog.Logger
 	client      *http.Client
 	config      *Config
+	baseURL     string
 }
 
 type Config struct {
@@ -32,45 +34,44 @@ type Config struct {
 	Token    string `envconfig:"EWELINK_TOKEN" required:"true"`
 }
 
-const urlFormat = "https://eu-api.coolkit.cc:8080/api/user/device/%s?appid=%s&version=8&deviceid=%s&nonce=%s&ts=%d"
+const apiURL = "https://eu-apia.coolkit.cc/v2/device/thing"
 
-//"https://eu-api.coolkit.cc:8080/api/user/device/a4800a8558?deviceid=a4800a8558&appid=YzfeftUVcZ6twZw1OoVKPRFYTrGEg01Q&nonce=adu5n393&ts=1751269167&version=8"
-
-type Device struct {
-	Code         int           `json:"code"`
-	Error        string        `json:"error"`
-	ID           string        `json:"_id"`
-	Name         string        `json:"name"`
-	Type         string        `json:"type"`
-	APIKey       string        `json:"apikey"`
-	DeviceID     string        `json:"deviceid"`
-	CreatedAt    string        `json:"createdAt"`
-	ShareUsers   []interface{} `json:"shareUsers"`
-	Online       bool          `json:"online"`
-	Address      string        `json:"address"`
-	Extra        Extra         `json:"extra"`
-	Params       Params        `json:"params"`
-	IP           string        `json:"ip"`
-	Location     string        `json:"location"`
-	Family       Family        `json:"family"`
-	OfflineTime  string        `json:"offlineTime"`
-	OnlineTime   string        `json:"onlineTime"`
-	BrandName    string        `json:"brandName"`
-	ProductModel string        `json:"productModel"`
-	UIID         int           `json:"uiid"`
+type thingListRequest struct {
+	ThingList []thingID `json:"thingList"`
 }
 
-type Extra struct {
-	ID            string        `json:"_id"`
-	Name          string        `json:"name"`
-	APIKey        string        `json:"apikey"`
-	DeviceID      string        `json:"deviceid"`
-	CreatedAt     string        `json:"createdAt"`
-	ExtraInfo     ExtraInfo     `json:"extra"`
-	PartnerDevice PartnerDevice `json:"partnerDevice"`
+type thingID struct {
+	ID string `json:"id"`
 }
 
-type ExtraInfo struct {
+type thingListResponse struct {
+	Error int           `json:"error"`
+	Msg   string        `json:"msg"`
+	Data  thingListData `json:"data"`
+}
+
+type thingListData struct {
+	ThingList []thing `json:"thingList"`
+}
+
+type thing struct {
+	ItemType int      `json:"itemType"`
+	ItemData itemData `json:"itemData"`
+	Index    int      `json:"index"`
+}
+
+type itemData struct {
+	Name         string `json:"name"`
+	DeviceID     string `json:"deviceid"`
+	APIKey       string `json:"apikey"`
+	Extra        extra  `json:"extra"`
+	BrandName    string `json:"brandName"`
+	ProductModel string `json:"productModel"`
+	Online       bool   `json:"online"`
+	Params       params `json:"params"`
+}
+
+type extra struct {
 	Mac           string `json:"mac"`
 	ApMac         string `json:"apmac"`
 	Model         string `json:"model"`
@@ -83,11 +84,7 @@ type ExtraInfo struct {
 	ReportProduct string `json:"reportProduct"`
 }
 
-type PartnerDevice struct {
-	EzVedioSerial string `json:"ezVedioSerial"`
-}
-
-type Params struct {
+type params struct {
 	BindInfos         map[string]interface{} `json:"bindInfos"`
 	SubDevID          string                 `json:"subDevId"`
 	ParentID          string                 `json:"parentid"`
@@ -106,18 +103,12 @@ type Params struct {
 	Humidity          string                 `json:"humidity"`
 	HumiComfortStatus int                    `json:"humiComfortStatus"`
 	TimeZone          int                    `json:"timeZone"`
-	SubDevRssiSetting SubDevRssiSetting      `json:"subDevRssiSetting"`
+	SubDevRssiSetting subDevRssiSetting      `json:"subDevRssiSetting"`
 }
 
-type SubDevRssiSetting struct {
+type subDevRssiSetting struct {
 	Active   int `json:"active"`
 	Duration int `json:"duration"`
-}
-
-type Family struct {
-	ID      string        `json:"id"`
-	Index   int           `json:"index"`
-	Members []interface{} `json:"members"`
 }
 
 func New(logger *zerolog.Logger) *Temperature {
@@ -129,63 +120,80 @@ func New(logger *zerolog.Logger) *Temperature {
 	}
 
 	return &Temperature{
-		lock:   sync.Mutex{},
-		logger: logger,
-		client: http.DefaultClient,
-		config: &config,
+		lock:    sync.Mutex{},
+		logger:  logger,
+		client:  http.DefaultClient,
+		config:  &config,
+		baseURL: apiURL,
 	}
 }
 
 func (t *Temperature) Fetch() {
-	nonce := strings.ReplaceAll(uuid.New().String(), "-", "")[:5]
+	nonce := strings.ReplaceAll(uuid.New().String(), "-", "")[:8]
 
 	ctx, cancelFn := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFn()
 
-	url := fmt.Sprintf(urlFormat, t.config.DeviceID, t.config.AppID, t.config.DeviceID, nonce, time.Now().Unix())
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	body, err := json.Marshal(thingListRequest{
+		ThingList: []thingID{{ID: t.config.DeviceID}},
+	})
 	if err != nil {
-		t.logger.Error().Err(fmt.Errorf("creating fetch request: %w", err))
+		t.logger.Error().Err(fmt.Errorf("encoding request body: %w", err)).Msg("")
 		return
 	}
 
-	req.Header.Set("Authorization", "Bearer "+t.config.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.baseURL, bytes.NewReader(body))
+	if err != nil {
+		t.logger.Error().Err(fmt.Errorf("creating fetch request: %w", err)).Msg("")
+		return
+	}
+
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/plain, */*")
+	req.Header.Set("Authorization", "Bearer "+t.config.Token)
+	req.Header.Set("X-CK-Nonce", nonce)
+	req.Header.Set("X-CK-Appid", t.config.AppID)
 
 	resp, err := t.client.Do(req)
 	if err != nil {
-		t.logger.Error().Err(fmt.Errorf("executing fetch request: %w", err))
+		t.logger.Error().Err(fmt.Errorf("executing fetch request: %w", err)).Msg("")
 		return
 	}
-
-	if resp.StatusCode != 200 {
-		t.logger.Error().Err(fmt.Errorf("go status: %d", resp.StatusCode))
-		return
-	}
-
 	defer resp.Body.Close()
 
-	response := &Device{}
-	err = json.NewDecoder(resp.Body).Decode(response)
-	if err != nil {
-		t.logger.Error().Err(fmt.Errorf("decoding response: %w", err))
+	if resp.StatusCode != http.StatusOK {
+		t.logger.Error().Msgf("unexpected status: %d", resp.StatusCode)
 		return
 	}
 
-	if response.Code != 0 {
-		t.logger.Error().Msgf("error: %s", response.Error)
+	var response thingListResponse
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		t.logger.Error().Err(fmt.Errorf("decoding response: %w", err)).Msg("")
 		return
 	}
 
-	temperature, err := strconv.ParseFloat(response.Params.Temperature, 64)
-	if err != nil {
-		t.logger.Error().Err(fmt.Errorf("parsing temperature: %w", err))
+	if response.Error != 0 {
+		t.logger.Error().Msgf("api error: %s", response.Msg)
 		return
 	}
 
-	humidity, err := strconv.ParseFloat(response.Params.Humidity, 64)
+	if len(response.Data.ThingList) == 0 {
+		t.logger.Error().Msg("empty device list in response")
+		return
+	}
+
+	p := response.Data.ThingList[0].ItemData.Params
+
+	temperature, err := strconv.ParseFloat(p.Temperature, 64)
 	if err != nil {
-		t.logger.Error().Err(fmt.Errorf("parsing humidity: %w", err))
+		t.logger.Error().Err(fmt.Errorf("parsing temperature: %w", err)).Msg("")
+		return
+	}
+
+	humidity, err := strconv.ParseFloat(p.Humidity, 64)
+	if err != nil {
+		t.logger.Error().Err(fmt.Errorf("parsing humidity: %w", err)).Msg("")
 		return
 	}
 
@@ -193,7 +201,7 @@ func (t *Temperature) Fetch() {
 	defer t.lock.Unlock()
 	t.temperature = temperature / 100.0
 	t.humidity = humidity / 100.0
-	t.battery = response.Params.Battery
+	t.battery = p.Battery
 	t.timestamp = time.Now()
 }
 

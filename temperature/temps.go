@@ -3,6 +3,7 @@ package temperature
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/zerolog"
 )
@@ -26,12 +28,14 @@ type Temperature struct {
 	client      *http.Client
 	config      *Config
 	baseURL     string
+	db          *sql.DB
 }
 
 type Config struct {
-	AppID    string `envconfig:"EWELINK_APP_ID" required:"true"`
-	DeviceID string `envconfig:"EWELINK_DEVICE_ID" required:"true"`
-	Token    string `envconfig:"EWELINK_TOKEN" required:"true"`
+	AppID       string `envconfig:"EWELINK_APP_ID" required:"true"`
+	DeviceID    string `envconfig:"EWELINK_DEVICE_ID" required:"true"`
+	Token       string `envconfig:"EWELINK_TOKEN" required:"true"`
+	DatabaseURL string `envconfig:"DATABASE_URL" required:"true"`
 }
 
 const apiURL = "https://eu-apia.coolkit.cc/v2/device/thing"
@@ -119,12 +123,23 @@ func New(logger *zerolog.Logger) *Temperature {
 		return nil
 	}
 
+	// lazy connection: sql.Open doesn't dial until first use, so a
+	// transiently unreachable postgres at startup doesn't stop the clock
+	// (temperature display) from working — Fetch just logs and retries
+	// on the next 5-minute tick
+	db, err := sql.Open("pgx", config.DatabaseURL)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to open database connection")
+		return nil
+	}
+
 	return &Temperature{
 		lock:    sync.Mutex{},
 		logger:  logger,
 		client:  http.DefaultClient,
 		config:  &config,
 		baseURL: apiURL,
+		db:      db,
 	}
 }
 
@@ -198,12 +213,24 @@ func (t *Temperature) Fetch() {
 	}
 
 	t.lock.Lock()
-	defer t.lock.Unlock()
 	t.temperature = temperature / 100.0
 	t.humidity = humidity / 100.0
 	t.battery = p.Battery
 	t.timestamp = time.Now()
+	t.lock.Unlock()
+
+	_, err = t.db.ExecContext(ctx, insertReadingSQL,
+		t.config.DeviceID, t.timestamp, t.temperature, t.humidity, t.battery)
+	if err != nil {
+		t.logger.Error().Err(fmt.Errorf("writing temperature reading: %w", err)).Msg("")
+	}
 }
+
+const insertReadingSQL = `
+INSERT INTO temperature_readings (device_id, recorded_at, temperature, humidity, battery)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (device_id, recorded_at) DO NOTHING;
+`
 
 func (t *Temperature) Run(ctx context.Context) {
 	t.Fetch()

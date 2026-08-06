@@ -1,0 +1,33 @@
+version: 2.1
+
+jobs:
+  build-and-push:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: Build image
+          command: |
+            docker build \
+              -t jdudmesh/clock:latest \
+              -t jdudmesh/clock:"${CIRCLE_SHA1}" \
+              .
+      - run:
+          name: Login to Docker Hub
+          command: echo "${DOCKERHUB_PASSWORD}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+      - run:
+          name: Push image
+          command: |
+            docker push jdudmesh/clock:latest
+            docker push jdudmesh/clock:"${CIRCLE_SHA1}"
+
+workflows:
+  build-and-push:
+    jobs:
+      - build-and-push:
+          filters:
+            branches:
+              only: main

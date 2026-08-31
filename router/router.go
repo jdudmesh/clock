@@ -24,6 +24,10 @@ func NewRouter(logger *zerolog.Logger, temperature *temperature.Temperature, alm
 		http.ServeFile(w, r, "static/clock.html")
 	})
 
+	mux.HandleFunc("/clock2", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/clock2.html")
+	})
+
 	mux.HandleFunc("/dist.css", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "static/dist.css")
 	})

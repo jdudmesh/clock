@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -80,7 +81,19 @@ func NewRouter(logger *zerolog.Logger, temperature *temperature.Temperature, alm
 	})
 
 	mux.HandleFunc("/data.json", func(w http.ResponseWriter, r *http.Request) {
+		temperatureVal, humidity, battery, timestamp := temperature.Get()
+		sunriseTime := almanac.GetSunrise()
+		sunsetTime := almanac.GetSunset()
+
 		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"temperature": temperatureVal,
+			"humidity":    humidity,
+			"battery":     battery,
+			"timestamp":   timestamp,
+			"sunrise":     sunriseTime.In(loc),
+			"sunset":      sunsetTime.In(loc),
+		})
 	})
 
 	return mux

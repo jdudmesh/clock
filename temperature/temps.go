@@ -35,7 +35,8 @@ type Config struct {
 	AppID       string `envconfig:"EWELINK_APP_ID" required:"true"`
 	DeviceID    string `envconfig:"EWELINK_DEVICE_ID" required:"true"`
 	Token       string `envconfig:"EWELINK_TOKEN" required:"true"`
-	DatabaseURL string `envconfig:"DATABASE_URL" required:"true"`
+	DatabaseURL string `envconfig:"DATABASE_URL"`
+	LogToDB     bool   `envconfig:"LOG_TO_DB" default:"true"`
 }
 
 const apiURL = "https://eu-apia.coolkit.cc/v2/device/thing"
@@ -123,14 +124,24 @@ func New(logger *zerolog.Logger) *Temperature {
 		return nil
 	}
 
-	// lazy connection: sql.Open doesn't dial until first use, so a
-	// transiently unreachable postgres at startup doesn't stop the clock
-	// (temperature display) from working — Fetch just logs and retries
-	// on the next 5-minute tick
-	db, err := sql.Open("pgx", config.DatabaseURL)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to open database connection")
-		return nil
+	var db *sql.DB
+	if config.LogToDB {
+		if config.DatabaseURL == "" {
+			logger.Fatal().Msg("DATABASE_URL must be set when LOG_TO_DB is true")
+			return nil
+		}
+
+		// lazy connection: sql.Open doesn't dial until first use, so a
+		// transiently unreachable postgres at startup doesn't stop the clock
+		// (temperature display) from working — Fetch just logs and retries
+		// on the next 5-minute tick
+		db, err = sql.Open("pgx", config.DatabaseURL)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("failed to open database connection")
+			return nil
+		}
+	} else {
+		logger.Info().Msg("LOG_TO_DB is false, skipping database connection")
 	}
 
 	return &Temperature{
@@ -218,6 +229,10 @@ func (t *Temperature) Fetch() {
 	t.battery = p.Battery
 	t.timestamp = time.Now()
 	t.lock.Unlock()
+
+	if !t.config.LogToDB {
+		return
+	}
 
 	_, err = t.db.ExecContext(ctx, insertReadingSQL,
 		t.config.DeviceID, t.timestamp, t.temperature, t.humidity, t.battery)

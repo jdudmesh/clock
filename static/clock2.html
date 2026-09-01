@@ -32,6 +32,7 @@
       display: flex;
       height: 100dvh;
       padding: 2dvh 3vw;
+      transition: opacity 1s ease;
     }
 
     .error {
@@ -138,12 +139,38 @@
       loadInto("sunset", "/snippets/sunset");
     }
 
+    let sunriseTime = null;
+    let sunsetTime = null;
+
+    async function loadDaylight() {
+      try {
+        const res = await fetch("/data.json");
+        if (!res.ok) throw new Error(res.status);
+        const data = await res.json();
+        sunriseTime = new Date(data.sunrise);
+        sunsetTime = new Date(data.sunset);
+        applyDimming();
+      } catch (error) {
+        console.error("Error loading daylight data: " + error.toString());
+      }
+    }
+
+    function applyDimming() {
+      if (!sunriseTime || !sunsetTime) return;
+      const now = new Date();
+      const isNight = now < sunriseTime || now > sunsetTime;
+      document.body.style.opacity = isNight ? "0.75" : "1";
+    }
+
     renderDateTime();
     loadWeather();
     loadSunriseSunset();
+    loadDaylight();
     setInterval(renderDateTime, 1000);
+    setInterval(applyDimming, 1000);
     setInterval(loadWeather, 300000);
     setInterval(loadSunriseSunset, 300000);
+    setInterval(loadDaylight, 24 * 60 * 60 * 1000);
   </script>
 </body>
 
